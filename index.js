@@ -1,106 +1,120 @@
-const { off } = require('process')
-const puppeteer = require('puppeteer')
-const reader = require('xlsx')
-const root_url = 'https://markastok.com'
-
-const file = reader.readFile('urls.xlsx')
-let data = []
-const sheets = file.SheetNames
-const temp = reader.utils.sheet_to_json(file.Sheets[sheets[0]])
-temp.forEach(x => data.push(x))
-
-const productNames = []
-const productPrices = []
-const productCodes = []
-const productAvailabilities = []
-const productOffers = []
-const productSalePrices = []
+const startScrape = require('./scrape.js')
+const cheerio = require('cheerio');
+const request = require('request');
+const fs = require('fs');
+const { start } = require('repl');
+const { reject } = require('bluebird');
 
 
-async function step1(){
-    const browser = await puppeteer.launch({
-        headless: true,
-    })
-    const page = await browser.newPage()
+const crawledPages = [];
+let foundPages = [];
+let index = 0;
 
-    await page.setRequestInterception(true)
-    page.on('request', (request) => {
-    if (request.resourceType() === 'image') request.abort()
-    else request.continue()
-})
-    for(let i=0;i<30;i++){
-    await page.goto(root_url + data[i].url,{ waitUntil: 'domcontentloaded' })
-    
-    
-    const el = await page.$(".product-name") || ""
-   
-    const stock = await page.$(".fl.productFunction2") || ""
-    /*const name = await page.evaluate(() => {
-        return document.querySelector(".product-name")
-    })*/
+const domain = "bedow.se";
 
-    /*const stock = await page.evaluate(() => {
-        return document.querySelector(".fl.productFunction2")
-    })*/
 
-    if(el != "" && stock == "")
-        await scrapeMetrics(page)
+crawl = async () => {
+	// here goes the magic
+
+	// if it's the first start
+    if (index === 0) {
+        // use / as first page.
+        foundPages.push(domain + '/');
     }
 
-    console.log(productNames,productPrices,productAvailabilities,productOffers,productSalePrices)
-    await browser.close()
+    const pageToCrawl = foundPages[index];	
+
+    const finish = new Promise(resolve =>{
+
+        resolve(process.exit)
+    })
+    
+    // exit the process if both arrays are the same or the next page is not defined
+    if (foundPages === crawledPages || !pageToCrawl) {
+        // stop
+        finish.then(await startScrape.start())
+        process.exit()
+    }
+    
+
+    // if pageToCrawl is not yet in list of crawledPages
+    if (crawledPages.indexOf(pageToCrawl) === -1) {
+        if (pageToCrawl) {
+            new Promise(resolve => {
+            	// visit the page
+            	visitPage(pageToCrawl, resolve);
+            }).then(function() {
+                index++;
+                crawl();
+            });
+        } else {
+             process.nextTick(crawl);
+        }
+    } else {
+        // go to next crawl
+         process.nextTick(crawl);
+    }
+   
 }
 
-
-async function scrapeMetrics(page){
-    // Product Name
-    const productName = await page.evaluate(()=>{
-        const fullText = document.querySelector(".product-name")
-        return fullText.textContent.slice(fullText.firstElementChild.textContent.length,).replace(/^\s\n|\n$/g,"")
-    })
-    productNames.push(productName)
-    
-    
-    // Product Price
-    const productPrice = await page.evaluate(() =>{
-        return document.querySelector(".product-price").textContent.trim()
-    })
-    productPrices.push(productPrice)
-
-    /*const productCode = await page.evaluate(()=>{
-        return document.querySelector(".product-feature-content :nth-child(1)").nextElementSibling.nextSibling.textContent.trim()
-    })
-    productCodes.push(productCode)*/
-
-    // Product Availability
-    const productAvailability = await page.evaluate(() => {
-        const allSizes = document.querySelectorAll('.col.box-border')
-        let activeSizes = 0
-        allSizes.forEach(size => {
-            if (!size.classList.contains("passive"))
-                activeSizes++
-        })
-        const availability = (activeSizes/allSizes.length * 100).toFixed(2)
-        return `${availability}%`
-    })
-    productAvailabilities.push(productAvailability)
-
-    // Product Offer
-    const productOffer = await page.evaluate(() => {
-        const offer = document.querySelector('.campaign-symbol')
-        if(offer == null){
-            return 0;
+visitPage =  (url, callback) => {
+    process.stdout.write(crawledPages.length + '/' + foundPages.length + '\n');
+	 // Make the request
+    request('https://' + url, async function(error, response, body) {
+        // Check status code (200 is HTTP OK)
+        if (!response || response.statusCode !== 200) {
+            process.nextTick(callback);
+            return;
         }
-        else{
-            return offer.innerText.match(/\d+/)[0]
-        }
-    })
-    productOffers.push(`%${productOffer}`)
 
-    // Product Sale Price
-    const productSalePrice = parseFloat(productPrice.replace(",",".")) - ((parseFloat(productPrice.replace(",",".")) * productOffer) / 100)
-    strSalePrice = `${productSalePrice.toFixed(2).replace(".",",")}`
-    productSalePrices.push(strSalePrice)
+        // Add URL to crawled Pages
+        crawledPages.push(url);
+
+        // Parse the document body
+        const $ = cheerio.load(body);
+        
+        // collect all links
+        collectInternalLinks($, domain, foundPages).then(
+            (newFoundPages) => {
+                foundPages = newFoundPages;
+                callback();
+        });
+    });
+}	
+
+collectInternalLinks =  ($, domain, foundPages) => {
+    return new Promise(resolve => {
+        
+        const elements = "a[href^='http://" + domain + "']:not(a[href^='mailto']), " +
+            "a[href^='https://" + domain + "']:not(a[href^='mailto']), " +
+            "a[href^='https://www." + domain + "']:not(a[href^='mailto']), " +
+            "a[href^='http://www." + domain + "']:not(a[href^='mailto']), " +
+            "a[href^='/']:not(a[href^='mailto'])";
+
+        const relativeLinks = $(elements);
+
+        relativeLinks.each(function(i, e) {
+
+            let href = $(this).attr('href');
+
+            if (href.indexOf('www.') !== -1) {
+                href = href.substr(href.indexOf('www.') + 4, href.length);
+            }
+            if (href.indexOf('http') === 0) {
+                href = href.substr(href.indexOf('://') + 3, href.length);
+            } else if (href.indexOf('/') === 0) {
+                href = domain + href;
+            }
+            
+            // only add the href to the foundPages if it's not there yet.
+            if (foundPages.indexOf(href) === -1) {
+                if(href.indexOf(/work/)===-1)
+                    foundPages.push(href)
+            }
+        })   
+         
+    resolve(foundPages);
+})
 }
 
-step1()
+crawl()
