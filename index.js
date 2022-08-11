@@ -9,10 +9,10 @@ const crawledPages = [];
 let foundPages = [];
 let index = 0;
 
-const domain = "bedow.se";
+const domain = "markastok.com";
 
 crawl = async () => {
-	// here goes the magic
+	
 
 	// if it's the first start
     if (index === 0) {
@@ -30,6 +30,7 @@ crawl = async () => {
     // exit the process if both arrays are the same or the next page is not defined
     if (foundPages === crawledPages || !pageToCrawl) {
         // stop
+        
         finish.then(await scrape.start(foundPages))
         process.exit()
         
@@ -107,11 +108,10 @@ collectInternalLinks =  ($, domain, foundPages) => {
             
             // only add the href to the foundPages if it's not there yet.
             if (foundPages.indexOf(href) === -1) {
-                if(href.indexOf(/work/)===-1)
+                    console.log(href)
                     foundPages.push(href)
-            }
-        })   
-         
+            }        
+        })          
     resolve(foundPages);
 })
 }
