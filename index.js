@@ -1,17 +1,15 @@
-const startScrape = require('./scrape.js')
+const scrape = require('./scrape.js')
 const cheerio = require('cheerio');
 const request = require('request');
 const fs = require('fs');
 const { start } = require('repl');
 const { reject } = require('bluebird');
 
-
 const crawledPages = [];
 let foundPages = [];
 let index = 0;
 
 const domain = "bedow.se";
-
 
 crawl = async () => {
 	// here goes the magic
@@ -26,14 +24,15 @@ crawl = async () => {
 
     const finish = new Promise(resolve =>{
 
-        resolve(process.exit)
+        resolve()
     })
     
     // exit the process if both arrays are the same or the next page is not defined
     if (foundPages === crawledPages || !pageToCrawl) {
         // stop
-        finish.then(await startScrape.start())
+        finish.then(await scrape.start(foundPages))
         process.exit()
+        
     }
     
 
