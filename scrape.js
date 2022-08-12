@@ -48,7 +48,7 @@ const results = await withBrowser(async (browser) => {
             const stock = await page.$(".fl.productFunction2") || ""
 
             if(el != "" && stock == ""){
-                const x = await scrapeMetrics(page,'https://'+ url)
+                const x = await scrapeMetrics(page,'https://' + url)
                 await gsapi.spreadsheets.values.append({
                     spreadsheetId: '1yLfWcf6T9m-2uWY3DHdnBUA3OJQaFjyAGpGSj-tlqXI',
                     range: `Sayfa1!A:B`,
@@ -90,12 +90,18 @@ async function scrapeMetrics(page,url){
     // Product Code
     const productCode = await page.evaluate(()=>{
         const splittedText = document.querySelector(".product-feature-content").textContent.split('\n').join(' ').trim().split(' ')
-        if(splittedText == ''){
-            return ''
-        }
-        else{
-            return searchForProductCode(splittedText[splittedText.length - 1])
-        }
+        let index = 0
+            for(char of splittedText[splittedText.length - 1]){
+                if(/\d/.test(char)){
+                    splittedText[splittedText.length - 1] = splittedText[splittedText.length - 1].slice(index,)
+                    break
+                }
+                else{
+                index++
+                }
+            }
+            return splittedText[splittedText.length - 1]
+        
     })
     productObject.productCode = productCode
     
@@ -145,20 +151,6 @@ async function gsFirstRow(){
                 ]
             }
         })
-}
-
-function searchForProductCode(code){
-    let index = 0
-    for(char of code){
-        if(/\d/.test(char)){
-            code = code.slice(index,)
-            break
-        }
-        else{
-        index++
-        }
-    }
-    return code
 }
 
 

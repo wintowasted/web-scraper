@@ -1,28 +1,30 @@
 function m(){
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName('Sayfa1')
-    var range = sheet.getRange(2,1,sheet.getLastRow()-1,6);
-    
-    range.sort(3);
-    
-    var newRange = sheet.getRange(1,1,sheet.getLastRow()-1,6)
-    var text = "";
-    var data = newRange.getValues();
-    
-    for(let i=0;i<newRange.getNumRows();i++){
-      for(let j=0;j<newRange.getNumColumns();j++){
-          text += data[i][j] + " / ";
-        }
-      }
-      text+="\n";
-    
-    console.log(text);
-    var email = "data@analyticahouse.com"
-    var name = "metehan akyıldız"
-    var message = text + "\n\n";
-    var subject = "Sending emails from a Spreadsheet";
-    MailApp.sendEmail(email, subject, message);
-    }
-    
-    
-    
+
+  // Sort data by Availability value
+var ss = SpreadsheetApp.getActiveSpreadsheet();
+var sheet = ss.getSheetByName('Sayfa1')
+var range = sheet.getRange(2,1,sheet.getLastRow()-1,7);
+range.sort(4);
+
+ // Send email 
+var spreadsheetId = ss.getId(); 
+var file          = DriveApp.getFileById(spreadsheetId);
+var url           = 'https://docs.google.com/spreadsheets/d/'+spreadsheetId+'/export?format=xlsx';
+var token         = ScriptApp.getOAuthToken();
+var response      = UrlFetchApp.fetch(url, {
+  headers: {
+    'Authorization': 'Bearer ' +  token
+  }
+});
+  
+var fileName = (ss.getName()) + '.xlsx';
+var blobs   = [response.getBlob().setName(fileName)];
+
+var receipient = "people@analyticahouse.com"
+var subject = "Metehan Akyıldız - Software Case Study"
+var emailbody = ""
+
+MailApp.sendEmail(receipient, subject, emailbody, {attachments: blobs});
+}
+
+
